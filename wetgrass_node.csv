@@ -1,0 +1,5 @@
+Account,NodeName,Type,x,y
+Cloudy,Cloudy,Type1,0,0.5
+Sprinkler,Sprinkler,Type1,-0.5,0
+Rain,Rain,Type1,0.5,0
+Wetgrass,Wetgrass,Type1,0,-0.5

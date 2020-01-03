@@ -1,0 +1,5 @@
+TransactionAmt,Source,Target,Date
+100,Cloudy,Sprinkler,1/1/2018
+100,Cloudy,Rain,1/1/2018
+100,Sprinkler,Wetgrass,1/1/2018
+100,Rain,Wetgrass,1/1/2018

@@ -23,69 +23,36 @@ ACCOUNT="A0001"
 ##############################################################################################################################################################
 def network_graph(yearRange, AccountToSearch):
 
-    edge1 = pd.read_csv('edge1.csv')
-    node1 = pd.read_csv('node1.csv')
+    edge1 = pd.read_csv('wetgrass_edge.csv')
+    node1 = pd.read_csv('wetgrass_node.csv')
 
-    # filter the record by datetime, to enable interactive control through the input box
-    edge1['Datetime'] = "" # add empty Datetime column to edge1 dataframe
+
     accountSet=set() # contain unique account
     for index in range(0,len(edge1)):
-        edge1['Datetime'][index] = datetime.strptime(edge1['Date'][index], '%d/%m/%Y')
-        if edge1['Datetime'][index].year<yearRange[0] or edge1['Datetime'][index].year>yearRange[1]:
-            edge1.drop(axis=0, index=index, inplace=True)
-            continue
         accountSet.add(edge1['Source'][index])
         accountSet.add(edge1['Target'][index])
 
-    # to define the centric point of the networkx layout
-    shells=[]
-    shell1=[]
-    shell1.append(AccountToSearch)
-    shells.append(shell1)
-    shell2=[]
-    for ele in accountSet:
-        if ele!=AccountToSearch:
-            shell2.append(ele)
-    shells.append(shell2)
 
 
     G = nx.from_pandas_edgelist(edge1, 'Source', 'Target', ['Source', 'Target', 'TransactionAmt', 'Date'], create_using=nx.MultiDiGraph())
-    nx.set_node_attributes(G, node1.set_index('Account')['CustomerName'].to_dict(), 'CustomerName')
+    nx.set_node_attributes(G, node1.set_index('Account')['NodeName'].to_dict(), 'NodeName')
     nx.set_node_attributes(G, node1.set_index('Account')['Type'].to_dict(), 'Type')
+    nx.set_node_attributes(G, node1.set_index('Account')['x'].to_dict(), 'x')
+    nx.set_node_attributes(G, node1.set_index('Account')['y'].to_dict(), 'y')
+
+
     # pos = nx.layout.spring_layout(G)
     # pos = nx.layout.circular_layout(G)
     # nx.layout.shell_layout only works for more than 3 nodes
-    if len(shell2)>1:
-        pos = nx.layout.shell_layout(G, shells)
-    else:
-        pos = nx.layout.spring_layout(G)
+
+
     for node in G.nodes:
-        G.nodes[node]['pos'] = list(pos[node])
+
+        coords = [G.nodes[node]['x'],G.nodes[node]['y']]
+        print(coords)
+        G.nodes[node]['pos'] = coords
 
 
-    if len(shell2)==0:
-        traceRecode = []  # contains edge_trace, node_trace, middle_node_trace
-
-        node_trace = go.Scatter(x=tuple([1]), y=tuple([1]), text=tuple([str(AccountToSearch)]), textposition="bottom center",
-                                mode='markers+text',
-                                marker={'size': 50, 'color': 'LightSkyBlue'})
-        traceRecode.append(node_trace)
-
-        node_trace1 = go.Scatter(x=tuple([1]), y=tuple([1]),
-                                mode='markers',
-                                marker={'size': 50, 'color': 'LightSkyBlue'},
-                                opacity=0)
-        traceRecode.append(node_trace1)
-
-        figure = {
-            "data": traceRecode,
-            "layout": go.Layout(title='Interactive Transaction Visualization', showlegend=False,
-                                margin={'b': 40, 'l': 40, 'r': 40, 't': 40},
-                                xaxis={'showgrid': False, 'zeroline': False, 'showticklabels': False},
-                                yaxis={'showgrid': False, 'zeroline': False, 'showticklabels': False},
-                                height=600
-                                )}
-        return figure
 
 
     traceRecode = []  # contains edge_trace, node_trace, middle_node_trace
@@ -113,7 +80,11 @@ def network_graph(yearRange, AccountToSearch):
     index = 0
     for node in G.nodes():
         x, y = G.nodes[node]['pos']
-        hovertext = "CustomerName: " + str(G.nodes[node]['CustomerName']) + "<br>" + "AccountType: " + str(
+        print(tuple([x]))
+
+
+
+        hovertext ="x"+str(G.nodes[node]['x'])+ "y"+str(G.nodes[node]['y'])+ "NodeName: " + str(G.nodes[node]['NodeName']) + "<br>" + "AccountType: " + str(
             G.nodes[node]['Type'])
         text = node1['Account'][index]
         node_trace['x'] += tuple([x])
@@ -144,7 +115,7 @@ def network_graph(yearRange, AccountToSearch):
     #################################################################################################################################################################
     figure = {
         "data": traceRecode,
-        "layout": go.Layout(title='Interactive Transaction Visualization', showlegend=False, hovermode='closest',
+        "layout": go.Layout(title='Visualisation Interactive', showlegend=False, hovermode='closest',
                             margin={'b': 40, 'l': 40, 'r': 40, 't': 40},
                             xaxis={'showgrid': False, 'zeroline': False, 'showticklabels': False},
                             yaxis={'showgrid': False, 'zeroline': False, 'showticklabels': False},
@@ -164,6 +135,14 @@ def network_graph(yearRange, AccountToSearch):
                                 ) for edge in G.edges]
                             )}
     return figure
+
+
+
+
+
+
+
+
 ######################################################################################################################################################################
 # styles: for right side hover/click component
 styles = {
@@ -175,7 +154,7 @@ styles = {
 
 app.layout = html.Div([
     #########################Title
-    html.Div([html.H1("Transaction Network Graph")],
+    html.Div([html.H1("Bayesian Network Graph")],
              className="row",
              style={'textAlign': "center"}),
     #############################################################################################define the row
@@ -193,24 +172,23 @@ app.layout = html.Div([
                     html.Div(
                         className="twelve columns",
                         children=[
-                            dcc.RangeSlider(
+                            dcc.Slider(
                                 id='my-range-slider',
-                                min=2010,
-                                max=2019,
-                                step=1,
-                                value=[2010, 2019],
+                                min=0,
+                                max=1,
+                                step=0.05,
+                                value=0.5,
                                 marks={
-                                    2010: {'label': '2010'},
-                                    2011: {'label': '2011'},
-                                    2012: {'label': '2012'},
-                                    2013: {'label': '2013'},
-                                    2014: {'label': '2014'},
-                                    2015: {'label': '2015'},
-                                    2016: {'label': '2016'},
-                                    2017: {'label': '2017'},
-                                    2018: {'label': '2018'},
-                                    2019: {'label': '2019'}
-                                }
+                                    0.1: {'label': '0.1'},
+                                    0.2: {'label': '0.2'},
+                                    0.3: {'label': '0.3'},
+                                    0.4: {'label': '0.4'},
+                                    0.5: {'label': '0.5'},
+                                    0.6: {'label': '0.6'},
+                                    0.7: {'label': '0.7'},
+                                    0.8: {'label': '0.8'},
+                                    0.9: {'label': '0.9'},
+                                    1: {'label': '1'}}
                             ),
                             html.Br(),
                             html.Div(id='output-container-range-slider')
