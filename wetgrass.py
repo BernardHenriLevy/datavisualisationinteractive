@@ -35,7 +35,7 @@ d3 = State(rain,  name="rain")
 d4 = State(wetgrass,  name="wetgrass")
 
 
-network = BayesianNetwork("Prédiction Ey->Br")
+network = BayesianNetwork("Prédiction")
 network.add_states(d1, d2, d3,d4)
 network.add_edge(d1, d2)
 network.add_edge(d1, d3)
@@ -44,6 +44,6 @@ network.add_edge(d3, d4)
 
 network.bake()
 
-beliefs = network.predict_proba({'cloudy': 'F'})
+beliefs = network.predict_proba({'sprinkler': 'V'})
 beliefs = map(str, beliefs)
 print("Probabilité ".join("{}{}".format(state.name, belief) for state, belief in zip(network.states, beliefs)))
