@@ -16,47 +16,33 @@ import math
 from pomegranate import *
 import json
 
-radio_options =[{'label': 'Montréal', 'value': 'MTL'},{'label': 'San Francisco', 'value': 'SF'}]
-# import the css template, and pass the css template into dash
+import math
+
+network = BayesianNetwork("Wetgrass")
+
+
+with open('wetgrass_network.json') as json_file:
+    data = json.load(json_file)
+    network = network.from_json(data)
+
+
+def truncate(number, digits) -> float:
+    stepper = 10.0 ** digits
+    return math.trunc(stepper * number) / stepper
+
+
+radio_options =[{'label': '', 'value': ''}]
+
+
+
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-app.title = "Transaction Network"
-
-YEAR=[2010, 2019]
-ACCOUNT="A0001"
+app.title = "Réseau Bayesien"
 
 
 
-cloudy_parameters = {'V': 0.5, 'F': 0.5}
-cloudy = DiscreteDistribution(cloudy_parameters)
-
-sprinkler_parameters = [['V', 'V',  0.1],['V', 'F',  0.9],['F', 'F', 0.5],['F', 'V',  0.5]]
-sprinkler = ConditionalProbabilityTable(sprinkler_parameters, [cloudy])
-
-
-rain_parameters = [['V', 'V',  0.8],['V', 'F',  0.2],['F', 'F', 0.8],['F', 'V',  0.2]]
-rain = ConditionalProbabilityTable(rain_parameters, [cloudy])
-
-
-wetgrass_parameters =  [['V', 'V','V',  0.99],['V', 'V','F',  0.01],['V', 'F','V',  0.9],['V', 'F','F',  0.1],['F', 'V','V',  0.9],['F', 'V','F',  0.1],['F', 'F','V',  0],['F', 'F','F' , 1],]
-wetgrass = ConditionalProbabilityTable(wetgrass_parameters, [sprinkler,rain])
-
-d1 = State(cloudy, name="Cloudy")
-d2 = State(sprinkler, name="Sprinkler")
-d3 = State(rain,  name="Rain")
-d4 = State(wetgrass,  name="Wetgrass")
-
-
-network = BayesianNetwork("Prédiction")
-network.add_states(d1, d2, d3,d4)
-network.add_edge(d1, d2)
-network.add_edge(d1, d3)
-network.add_edge(d2, d4)
-network.add_edge(d3, d4)
-
-network.bake()
-
-
+#Prediction des probabilités
+#param::dictionnary Noeud qui sont connu avant prédiction
 def predict(dictionnary):
     beliefs = network.predict_proba(dictionnary)
     beliefs = map(str, beliefs)
@@ -64,18 +50,21 @@ def predict(dictionnary):
     result = {}
 
     for state, belief in zip(network.states, beliefs):
-        # print(state.name)
+        #print(state.name)
+        #print(state)
         # Uniquement quand le réseaux retoure un json
         if len(belief) > 3:
             y = json.loads(belief)
-            # print(y['parameters'][0])
+            #Renvoi les probabilités calculées par le réseau
             result[state.name] = y['parameters'][0]
+
+    #Pour les noeuds connu avant prédiction on garde la même valeur
     for d in dictionnary:
         result[d] = dictionnary[d]
     return result
 
 
-dic = {'Cloudy': 'V'}
+dic = {}
 
 res = predict(dic)
 
@@ -85,7 +74,7 @@ res = predict(dic)
 
 
 
-def network_graph(yearRange, AccountToSearch):
+def network_graph(res):
 
     edge1 = pd.read_csv('wetgrass_edge.csv')
     node1 = pd.read_csv('wetgrass_node.csv')
@@ -98,7 +87,7 @@ def network_graph(yearRange, AccountToSearch):
 
 
 
-    G = nx.from_pandas_edgelist(edge1, 'Source', 'Target', ['Source', 'Target', 'TransactionAmt', 'Date'], create_using=nx.MultiDiGraph())
+    G = nx.from_pandas_edgelist(edge1, 'Source', 'Target', ['Source', 'Target', 'Value', 'Date'], create_using=nx.MultiDiGraph())
     nx.set_node_attributes(G, node1.set_index('Account')['NodeName'].to_dict(), 'NodeName')
     nx.set_node_attributes(G, node1.set_index('Account')['Type'].to_dict(), 'Type')
     nx.set_node_attributes(G, node1.set_index('Account')['x'].to_dict(), 'x')
@@ -128,7 +117,7 @@ def network_graph(yearRange, AccountToSearch):
     for edge in G.edges:
         x0, y0 = G.nodes[edge[0]]['pos']
         x1, y1 = G.nodes[edge[1]]['pos']
-        weight = float(G.edges[edge]['TransactionAmt']) / max(edge1['TransactionAmt']) * 10
+        weight = float(G.edges[edge]['Value']) / max(edge1['Value']) * 10
         trace = go.Scatter(x=tuple([x0, x1, None]), y=tuple([y0, y1, None]),
                            mode='lines',
                            line={'width': weight},
@@ -148,7 +137,7 @@ def network_graph(yearRange, AccountToSearch):
 
 
 
-        hovertext ="x"+str(G.nodes[node]['x'])+ "y"+str(G.nodes[node]['y'])+ "NodeName: " + str(G.nodes[node]['NodeName']) + "<br>" + "Probabilités : " + str(res[str(G.nodes[node]['NodeName'])])
+        hovertext ="x"+str(G.nodes[node]['x'])+ "y"+str(G.nodes[node]['y'])+ "Noeud: " + str(G.nodes[node]['NodeName']) + "<br>" + "Probabilités : " + str(res[str(G.nodes[node]['NodeName'])])
         text = node1['Account'][index]
         node_trace['x'] += tuple([x])
         node_trace['y'] += tuple([y])
@@ -167,8 +156,8 @@ def network_graph(yearRange, AccountToSearch):
         x0, y0 = G.nodes[edge[0]]['pos']
         x1, y1 = G.nodes[edge[1]]['pos']
         hovertext = "From: " + str(G.edges[edge]['Source']) + "<br>" + "To: " + str(
-            G.edges[edge]['Target']) + "<br>" + "TransactionAmt: " + str(
-            G.edges[edge]['TransactionAmt']) + "<br>" + "TransactionDate: " + str(G.edges[edge]['Date'])
+            G.edges[edge]['Target']) + "<br>" + "Value: " + str(
+            G.edges[edge]['Value']) + "<br>" + "TransactionDate: " + str(G.edges[edge]['Date'])
         middle_hover_trace['x'] += tuple([(x0 + x1) / 2])
         middle_hover_trace['y'] += tuple([(y0 + y1) / 2])
         middle_hover_trace['hovertext'] += tuple([hovertext])
@@ -176,6 +165,7 @@ def network_graph(yearRange, AccountToSearch):
 
     traceRecode.append(middle_hover_trace)
     #################################################################################################################################################################
+
     figure = {
         "data": traceRecode,
         "layout": go.Layout(title='Visualisation Interactive', showlegend=False, hovermode='closest',
@@ -207,7 +197,6 @@ def network_graph(yearRange, AccountToSearch):
 
 
 ######################################################################################################################################################################
-# styles: for right side hover/click component
 styles = {
     'pre': {
         'border': 'thin lightgrey solid',
@@ -216,21 +205,20 @@ styles = {
 }
 
 app.layout = html.Div([
-    #########################Title
+    #########################Titre
     html.Div([html.H1("Bayesian Network Graph")],
              className="row",
              style={'textAlign': "center"}),
-    #############################################################################################define the row
+    #############################################################################################Structure
     html.Div(
         className="row",
         children=[
-            ##############################################left side two input components
+            ##############################################Gauche
             html.Div(
                 className="two columns",
                 children=[
                     dcc.Markdown(d("""
-                            **Time Range To Visualize**
-                            Slide the bar to define year range.
+                            **Probabilité Noeud 1**
                             """)),
                     html.Div(
                         className="twelve columns",
@@ -284,51 +272,40 @@ app.layout = html.Div([
                         ],
                         style={'height': '300px'}
                     ),
-                    html.Div(
-                        className="twelve columns",
-                        children=[
-                            dcc.Markdown(d("""
-                            **Account To Search**
-                            Input the account to visualize.
-                            """)),
-                            dcc.Input(id="input1", type="text", placeholder="Account"),
-                            html.Div(id="output")
-                        ],
-                        style={'height': '300px'}
-                    )
+
                 ]
             ),
 
-            ############################################middle graph component
+            ############################################Graph Reseau
             html.Div(
                 className="eight columns",
                 children=[dcc.Graph(id="my-graph",
-                                    figure=network_graph(YEAR, ACCOUNT))],
+                                    figure=network_graph(res))],
             ),
 
-            #########################################right side two output component
+            #########################################Droit
             html.Div(
                 className="two columns",
                 children=[
                     html.Div(
                         className='twelve columns',
                         children=[
-                            dcc.RadioItems(
-                                id='radio',
-                                options=radio_options,
-                                value='MTL'),
-                            html.Pre(id='hover-data', style=styles['pre'])
+                            dcc.Markdown(d("""
+                            **Paramètres Noeud selectionné**
+                            """)),
+                            html.Pre(id='click-data', style=styles['pre'])
                         ],
                         style={'height': '400px'}),
 
+                    html.H4('Probabilités ',id="tilte_proba"),
                     html.Div(
                         className='twelve columns',
                         children=[
-                            dcc.Markdown(d("""
-                            **Click Data**
-                            Click on points in the graph.
-                            """)),
-                            html.Pre(id='click-data', style=styles['pre'])
+                            dcc.RadioItems(
+                                id='radio',
+                                options=radio_options,
+                                value=''),
+                            html.Pre(id='hover-data', style=styles['pre'])
                         ],
                         style={'height': '400px'})
                 ]
@@ -340,24 +317,48 @@ app.layout = html.Div([
 ###################################callback for left side components
 @app.callback(
     dash.dependencies.Output('my-graph', 'figure'),
-    [dash.dependencies.Input('my-range-slider', 'value'), dash.dependencies.Input('input1', 'value')])
-def update_output(value,input1):
-    YEAR = value
-    ACCOUNT = input1
+    [dash.dependencies.Input('radio', 'value'),dash.dependencies.Input('tilte_proba', 'children')])
+def update_output2(value,node_name):
 
-    #print(value)
-    return network_graph(value, input1)
-    # to update the global variable of YEAR and ACCOUNT
+    global res
+
+    if len(value)>0:
+        dic = {node_name:value}
+        global res
+        res = predict(dic)
+
+    return network_graph(res)
+
+
+
 ################################callback for right side components
 @app.callback(
-    dash.dependencies.Output('radio', 'options'),
+    [dash.dependencies.Output('radio', 'options'),dash.dependencies.Output('tilte_proba', 'children')],
     [dash.dependencies.Input('my-graph', 'hoverData')])
-def display_hover_data(hoverData):
-    res = json.dumps(hoverData, indent=2)
-    test = json.loads(json.dumps(hoverData, indent=2))
 
-    radio_options = [{'label': test['points'][0]['text'], 'value': 'NYC'},{'label': 'Montréal', 'value': 'MTL'},{'label': 'San Francisco', 'value': 'SF'}]
-    return radio_options
+def display_hover_data(hoverData):
+    selected_node = json.loads(json.dumps(hoverData, indent=2))
+
+
+    if selected_node is None:
+        radio_options = [{'label': '', 'value': ''}]
+        return radio_options,''
+
+    #Si Noeud
+    if 'text' in selected_node['points'][0]:
+
+        title = selected_node['points'][0]['text']
+        #print(res[title]['V'])
+        radio_options = [{'label': "V :"+str(round(res[title]['V'],2)), 'value': 'V'}, {'label': "F :"+str(round(res[title]['F'],2)), 'value': 'F'},]
+        return radio_options,title
+
+
+    else:
+        radio_options = [{'label': '', 'value': ''}]
+        return radio_options,''
+
+
+
 
 
 @app.callback(
@@ -365,8 +366,8 @@ def display_hover_data(hoverData):
     [dash.dependencies.Input('my-graph', 'clickData')])
 def display_click_data(clickData):
     res = json.dumps(clickData, indent=2)
-    test = json.loads(json.dumps(clickData, indent=2))
-    print(test['points'][0]['text'])
+
+
 
     return res
 
