@@ -290,9 +290,16 @@ app.layout = html.Div([
                     html.Div(
                         className='twelve columns',
                         children=[
-                            dcc.Markdown(d("""
-                            **Paramètres Noeud selectionné**
-                            """)),
+                            dcc.Checklist(
+                                id='checklist_proba',
+                                options=[
+                                    {'label': 'New York City', 'value': 'NYC'},
+                                    {'label': 'Montréal', 'value': 'MTL'},
+                                    {'label': 'San Francisco', 'value': 'SF'}
+                                ],
+                                value=['MTL', 'SF'],
+                                labelStyle={'display': 'inline-block'}
+                            ),
                             html.Pre(id='click-data', style=styles['pre'])
                         ],
                         style={'height': '400px'}),
