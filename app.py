@@ -5,6 +5,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import networkx as nx
 import plotly.graph_objs as go
+import dash_table
 
 import pandas as pd
 from colour import Color
@@ -18,9 +19,27 @@ import json
 
 import math
 
+
+
+# TODO :
+# Creer tableau selon les parametres du noeud.
+#
+#
+
 network = BayesianNetwork("Wetgrass")
 
 
+
+
+app = dash.Dash(__name__)
+
+params = [
+    'Weight', 'Torque', 'Width', 'Height',
+    'Efficiency', 'Power', 'Displacement'
+]
+
+
+#Import du reseau en json
 with open('wetgrass_network.json') as json_file:
     data = json.load(json_file)
     network = network.from_json(data)
@@ -39,6 +58,22 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "Réseau Bayesien"
 
+
+def get_state_by_name(node_name):
+    global network
+    for state in network.states:
+        if (state.name == node_name):
+            if (state.distribution.name == "DiscreteDistribution"):
+                return state.distribution.parameters, state.distribution.name
+            if (state.distribution.name == "ConditionalProbabilityTable"):
+                return state.distribution.parameters[0], state.distribution.name
+
+
+def update_state_by_name(node_name, table):
+    global network
+    for state in network.states:
+        if (state.name == node_name):
+            state.distribution.parameters[0] = table
 
 
 #Prediction des probabilités
@@ -287,22 +322,21 @@ app.layout = html.Div([
             html.Div(
                 className="two columns",
                 children=[
-                    html.Div(
-                        className='twelve columns',
-                        children=[
-                            dcc.Checklist(
-                                id='checklist_proba',
-                                options=[
-                                    {'label': 'New York City', 'value': 'NYC'},
-                                    {'label': 'Montréal', 'value': 'MTL'},
-                                    {'label': 'San Francisco', 'value': 'SF'}
-                                ],
-                                value=['MTL', 'SF'],
-                                labelStyle={'display': 'inline-block'}
+                    html.Div([
+                        dash_table.DataTable(
+                            id='table-editing-simple',
+                            columns=(
+                                    [{'id': 'Model', 'name': 'Model'}] +
+                                    [{'id': p, 'name': p} for p in params]
                             ),
-                            html.Pre(id='click-data', style=styles['pre'])
-                        ],
-                        style={'height': '400px'}),
+                            data=[
+                                dict(Model=i, **{param: 0 for param in params})
+                                for i in range(1, 5)
+                            ],
+                            editable=True
+                        ),
+
+                    ]),
 
                     html.H4('Probabilités ',id="tilte_proba"),
                     html.Div(
@@ -322,23 +356,67 @@ app.layout = html.Div([
 ])
 
 ###################################callback for left side components
+
+'''
 @app.callback(
     dash.dependencies.Output('my-graph', 'figure'),
     [dash.dependencies.Input('radio', 'value'),dash.dependencies.Input('tilte_proba', 'children')])
 def update_output2(value,node_name):
-
     global res
-
     if len(value)>0:
         dic = {node_name:value}
         global res
         res = predict(dic)
 
     return network_graph(res)
-
+'''
 
 
 ################################callback for right side components
+@app.callback(
+    [dash.dependencies.Output('table-editing-simple', 'columns'),
+    dash.dependencies.Output('table-editing-simple', 'data')],
+    [dash.dependencies.Input('my-graph', 'clickData')])
+def display_click_data(clickData):
+    selected_node = json.loads(json.dumps(clickData, indent=2))
+    if selected_node is None:
+      title = "Rain"
+    else:
+        title = selected_node['points'][0]['text']
+
+    res, res1 = get_state_by_name(title)
+    params = []
+
+    # Nommage des colonnes
+    for i in range(0, len(res[0])):
+        if i == len(res[0]) - 1:
+            params.append("Proba")
+        elif i == len(res[0]) - 2:
+            params.append("Valeur")
+        else:
+            params.append("Parent" + str(i + 1))
+
+    cols = (
+        [{'id': p, 'name': p} for p in params]
+    )
+
+    data = []
+
+    for r in res:
+        dic = {}
+        for idx, val in enumerate(params):
+            if idx == len(params)-1:
+                dic[val] = round(r[idx],2)
+            else:
+                dic[val] = r[idx]
+        data.append(dic)
+
+
+    return cols,data
+
+
+
+
 @app.callback(
     [dash.dependencies.Output('radio', 'options'),dash.dependencies.Output('tilte_proba', 'children')],
     [dash.dependencies.Input('my-graph', 'hoverData')])
@@ -365,20 +443,25 @@ def display_hover_data(hoverData):
         return radio_options,''
 
 
-
-
-
 @app.callback(
-    dash.dependencies.Output('click-data', 'children'),
-    [dash.dependencies.Input('my-graph', 'clickData')])
-def display_click_data(clickData):
-    res = json.dumps(clickData, indent=2)
-
-
-
-    return res
-
-
+    dash.dependencies.Output('my-graph', 'figure'),
+    [dash.dependencies.Input('table-editing-simple', 'data'),
+     dash.dependencies.Input('table-editing-simple', 'columns')])
+def display_output(rows, columns):
+    df = pd.DataFrame(rows, columns=[c['name'] for c in columns])
+    global res
+    return network_graph(res)
+    '''
+    return {
+        'data': [{
+            'type': 'parcoords',
+            'dimensions': [{
+                'label': col['name'],
+                'values': df[col['id']]
+            } for col in columns]
+        }]
+    }
+    '''
 
 if __name__ == '__main__':
     app.run_server(debug=True)
