@@ -319,9 +319,11 @@ app.layout = html.Div([
             ),
 
             #########################################Droit
+
             html.Div(
                 className="two columns",
                 children=[
+                    html.H4('None', id="tilte_table"),
                     html.Div([
                         dash_table.DataTable(
                             id='table-editing-simple',
@@ -375,11 +377,11 @@ def update_output2(value,node_name):
 ################################callback for right side components
 @app.callback(
     [dash.dependencies.Output('table-editing-simple', 'columns'),
-    dash.dependencies.Output('table-editing-simple', 'data')],
+    dash.dependencies.Output('table-editing-simple', 'data'),
+     dash.dependencies.Output('tilte_table', 'children')],
     [dash.dependencies.Input('my-graph', 'clickData')])
 def display_click_data(clickData):
     selected_node = json.loads(json.dumps(clickData, indent=2))
-
 
     if selected_node is None:
       title = "Rain"
@@ -387,7 +389,7 @@ def display_click_data(clickData):
         title = selected_node['points'][0]['text']
 
     res, res1 = get_state_by_name(title)
-
+    #Si Noeud Parent
     if isinstance(res[0], dict):
         print('Node Parent')
         cols = ()
@@ -412,10 +414,11 @@ def display_click_data(clickData):
             dic[r]=res[0][r]
         data.append(dic)
 
-        return cols, data
+        return cols, data,title
+
+    #Si noeud enfant
     else:
         print("Node Enfant")
-
 
         params = []
 
@@ -444,7 +447,7 @@ def display_click_data(clickData):
             data.append(dic)
 
 
-        return cols,data
+        return cols,data,title
 
 
 
@@ -481,6 +484,7 @@ def display_hover_data(hoverData):
      dash.dependencies.Input('table-editing-simple', 'columns')])
 def display_output(rows, columns):
     df = pd.DataFrame(rows, columns=[c['name'] for c in columns])
+    print(df)
     global res
     return network_graph(res)
     '''
