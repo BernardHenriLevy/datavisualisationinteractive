@@ -379,40 +379,72 @@ def update_output2(value,node_name):
     [dash.dependencies.Input('my-graph', 'clickData')])
 def display_click_data(clickData):
     selected_node = json.loads(json.dumps(clickData, indent=2))
+
+
     if selected_node is None:
       title = "Rain"
     else:
         title = selected_node['points'][0]['text']
 
     res, res1 = get_state_by_name(title)
-    params = []
 
-    # Nommage des colonnes
-    for i in range(0, len(res[0])):
-        if i == len(res[0]) - 1:
-            params.append("Proba")
-        elif i == len(res[0]) - 2:
-            params.append("Valeur")
-        else:
-            params.append("Parent" + str(i + 1))
+    if isinstance(res[0], dict):
+        print('Node Parent')
+        cols = ()
 
-    cols = (
-        [{'id': p, 'name': p} for p in params]
-    )
+        params = []
 
-    data = []
+        for results in res[0]:
+            params.append(results)
+            print(results)
+            print(res[0][results])
 
-    for r in res:
+        cols = (
+            [{'id': p, 'name': p} for p in params]
+        )
+
+
+        data = []
+
         dic = {}
-        for idx, val in enumerate(params):
-            if idx == len(params)-1:
-                dic[val] = round(r[idx],2)
-            else:
-                dic[val] = r[idx]
+
+        for r in res[0]:
+            dic[r]=res[0][r]
         data.append(dic)
 
+        return cols, data
+    else:
+        print("Node Enfant")
 
-    return cols,data
+
+        params = []
+
+        # Nommage des colonnes
+        for i in range(0, len(res[0])):
+            if i == len(res[0]) - 1:
+                params.append("Proba")
+            elif i == len(res[0]) - 2:
+                params.append("Valeur")
+            else:
+                params.append("Parent" + str(i + 1))
+
+        cols = (
+            [{'id': p, 'name': p} for p in params]
+        )
+
+        data = []
+
+        for r in res:
+            dic = {}
+            for idx, val in enumerate(params):
+                if idx == len(params)-1:
+                    dic[val] = round(r[idx],2)
+                else:
+                    dic[val] = r[idx]
+            data.append(dic)
+
+
+        return cols,data
 
 
 
