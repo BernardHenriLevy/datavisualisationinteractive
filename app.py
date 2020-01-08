@@ -392,6 +392,7 @@ def display_click_data(clickData):
     #Si Noeud Parent
     if isinstance(res[0], dict):
         print('Node Parent')
+        print(res[0])
         cols = ()
 
         params = []
@@ -419,7 +420,7 @@ def display_click_data(clickData):
     #Si noeud enfant
     else:
         print("Node Enfant")
-
+        print(res)
         params = []
 
         # Nommage des colonnes
@@ -481,10 +482,16 @@ def display_hover_data(hoverData):
 @app.callback(
     dash.dependencies.Output('my-graph', 'figure'),
     [dash.dependencies.Input('table-editing-simple', 'data'),
-     dash.dependencies.Input('table-editing-simple', 'columns')])
-def display_output(rows, columns):
+     dash.dependencies.Input('table-editing-simple', 'columns'),
+     dash.dependencies.Input('tilte_table', 'children')])
+def display_output(rows, columns,title):
     df = pd.DataFrame(rows, columns=[c['name'] for c in columns])
-    print(df)
+    try:
+        df['Proba'] = df['Proba'].astype(float)
+        update_state_by_name(title,df.values.tolist())
+    except:
+        print("Problème")
+
     global res
     return network_graph(res)
     '''
