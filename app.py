@@ -392,15 +392,15 @@ def display_click_data(clickData):
     #Si Noeud Parent
     if isinstance(res[0], dict):
         print('Node Parent')
-        print(res[0])
+        #print(res[0])
         cols = ()
 
         params = []
 
         for results in res[0]:
             params.append(results)
-            print(results)
-            print(res[0][results])
+            #print(results)
+            #print(res[0][results])
 
         cols = (
             [{'id': p, 'name': p} for p in params]
@@ -420,7 +420,7 @@ def display_click_data(clickData):
     #Si noeud enfant
     else:
         print("Node Enfant")
-        print(res)
+        #print(res)
         params = []
 
         # Nommage des colonnes
@@ -485,12 +485,16 @@ def display_hover_data(hoverData):
      dash.dependencies.Input('table-editing-simple', 'columns'),
      dash.dependencies.Input('tilte_table', 'children')])
 def display_output(rows, columns,title):
-    df = pd.DataFrame(rows, columns=[c['name'] for c in columns])
-    try:
-        df['Proba'] = df['Proba'].astype(float)
-        update_state_by_name(title,df.values.tolist())
-    except:
-        print("Problème")
+
+    #Si noeud enfant
+    if columns[0]['id'] =="Parent1":
+        df = pd.DataFrame(rows, columns=[c['name'] for c in columns])
+
+        try:
+            df['Proba'] = df['Proba'].astype(float)
+            update_state_by_name(title,df.values.tolist())
+        except:
+            print("Problème")
 
     global res
     return network_graph(res)
