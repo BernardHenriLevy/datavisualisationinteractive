@@ -69,16 +69,24 @@ def get_state_by_name(node_name):
                 return state.distribution.parameters[0], state.distribution.name
 
 
-def update_state_by_name(node_name, table):
+def update_child_node_state_by_name(node_name, table):
     global network
     for state in network.states:
         if (state.name == node_name):
             state.distribution.parameters[0] = table
 
+def update_parent_node_state_by_name(node_name, table):
+    global network
+    for state in network.states:
+        if (state.name == node_name):
+            state.distribution.parameters = table
 
 #Prediction des probabilités
 #param::dictionnary Noeud qui sont connu avant prédiction
 def predict(dictionnary):
+    global network
+
+    network.bake()
     beliefs = network.predict_proba(dictionnary)
     beliefs = map(str, beliefs)
 
@@ -190,12 +198,14 @@ def network_graph(res):
     for edge in G.edges:
         x0, y0 = G.nodes[edge[0]]['pos']
         x1, y1 = G.nodes[edge[1]]['pos']
+        '''
         hovertext = "From: " + str(G.edges[edge]['Source']) + "<br>" + "To: " + str(
             G.edges[edge]['Target']) + "<br>" + "Value: " + str(
             G.edges[edge]['Value']) + "<br>" + "TransactionDate: " + str(G.edges[edge]['Date'])
         middle_hover_trace['x'] += tuple([(x0 + x1) / 2])
         middle_hover_trace['y'] += tuple([(y0 + y1) / 2])
         middle_hover_trace['hovertext'] += tuple([hovertext])
+        '''
         index = index + 1
 
     traceRecode.append(middle_hover_trace)
@@ -339,18 +349,8 @@ app.layout = html.Div([
                         ),
 
                     ]),
+                    html.Button('Mise à Jour', id='button_update'),
 
-                    html.H4('Probabilités ',id="tilte_proba"),
-                    html.Div(
-                        className='twelve columns',
-                        children=[
-                            dcc.RadioItems(
-                                id='radio',
-                                options=radio_options,
-                                value=''),
-                            html.Pre(id='hover-data', style=styles['pre'])
-                        ],
-                        style={'height': '400px'})
                 ]
             )
         ]
@@ -374,55 +374,34 @@ def update_output2(value,node_name):
 '''
 
 
-################################callback for right side components
-@app.callback(
-    [dash.dependencies.Output('table-editing-simple', 'columns'),
-    dash.dependencies.Output('table-editing-simple', 'data'),
-     dash.dependencies.Output('tilte_table', 'children')],
-    [dash.dependencies.Input('my-graph', 'clickData')])
-def display_click_data(clickData):
-    selected_node = json.loads(json.dumps(clickData, indent=2))
-
-    if selected_node is None:
-      title = "Rain"
-    else:
-        title = selected_node['points'][0]['text']
-
+def get_node_data(title):
     res, res1 = get_state_by_name(title)
-    #Si Noeud Parent
+    print(title)
+    print(res)
+    # Si Noeud Parent
     if isinstance(res[0], dict):
         print('Node Parent')
-        #print(res[0])
+        # print(res[0])
         cols = ()
-
         params = []
-
         for results in res[0]:
             params.append(results)
-            #print(results)
-            #print(res[0][results])
-
+            # print(results)
+            # print(res[0][results])
         cols = (
             [{'id': p, 'name': p} for p in params]
         )
-
-
         data = []
-
         dic = {}
-
         for r in res[0]:
-            dic[r]=res[0][r]
+            dic[r] = res[0][r]
         data.append(dic)
-
-        return cols, data,title
-
-    #Si noeud enfant
+        return cols, data, title
+    # Si noeud enfant
     else:
         print("Node Enfant")
-        #print(res)
+        # print(res)
         params = []
-
         # Nommage des colonnes
         for i in range(0, len(res[0])):
             if i == len(res[0]) - 1:
@@ -431,28 +410,38 @@ def display_click_data(clickData):
                 params.append("Valeur")
             else:
                 params.append("Parent" + str(i + 1))
-
         cols = (
             [{'id': p, 'name': p} for p in params]
         )
-
         data = []
-
         for r in res:
             dic = {}
             for idx, val in enumerate(params):
-                if idx == len(params)-1:
-                    dic[val] = round(r[idx],2)
+                if idx == len(params) - 1:
+                    dic[val] = round(r[idx], 2)
                 else:
                     dic[val] = r[idx]
             data.append(dic)
+        return cols, data, title
+
+################################callback for right side components
+@app.callback(
+    [dash.dependencies.Output('table-editing-simple', 'columns'),
+    dash.dependencies.Output('table-editing-simple', 'data'),
+     dash.dependencies.Output('tilte_table', 'children')],
+    [dash.dependencies.Input('my-graph', 'clickData')])
+def display_click_data(hoverData):
+    selected_node = json.loads(json.dumps(hoverData, indent=2))
+    print(selected_node)
+    if selected_node is None:
+      title = "Rain"
+    else:
+        title = selected_node['points'][0]['text']
+    return get_node_data(title)
 
 
-        return cols,data,title
 
-
-
-
+'''
 @app.callback(
     [dash.dependencies.Output('radio', 'options'),dash.dependencies.Output('tilte_proba', 'children')],
     [dash.dependencies.Input('my-graph', 'hoverData')])
@@ -477,15 +466,49 @@ def display_hover_data(hoverData):
     else:
         radio_options = [{'label': '', 'value': ''}]
         return radio_options,''
+'''
+
+@app.callback(
+    dash.dependencies.Output('my-graph', 'figure'),
+    [dash.dependencies.Input('button_update', 'n_clicks')],
+    [dash.dependencies.State('table-editing-simple', 'data'),
+    dash.dependencies.State('table-editing-simple', 'columns'),
+    dash.dependencies.State('tilte_table', 'children')])
+def update_output(trigger,rows,columns,title):
+    global res
+
+    print(title)
+    print(rows)
+    print(columns)
+
+    # Si noeud enfant
+    if columns[0]['id'] == "Parent1":
+        df = pd.DataFrame(rows, columns=[c['name'] for c in columns])
+
+        try:
+            df['Proba'] = df['Proba'].astype(float)
+            update_child_node_state_by_name(title, df.values.tolist())
+        except:
+            print("Problème")
+    else:
+        for r in rows[0]:
+            rows[0][r] = float(rows[0][r])
+        update_parent_node_state_by_name(title,rows)
 
 
+    res = predict(dic)
+    return network_graph(res)
+
+
+
+'''
 @app.callback(
     dash.dependencies.Output('my-graph', 'figure'),
     [dash.dependencies.Input('table-editing-simple', 'data'),
      dash.dependencies.Input('table-editing-simple', 'columns'),
      dash.dependencies.Input('tilte_table', 'children')])
 def display_output(rows, columns,title):
-
+    
     #Si noeud enfant
     if columns[0]['id'] =="Parent1":
         df = pd.DataFrame(rows, columns=[c['name'] for c in columns])
@@ -498,7 +521,7 @@ def display_output(rows, columns,title):
 
     global res
     return network_graph(res)
-    '''
+
     return {
         'data': [{
             'type': 'parcoords',
